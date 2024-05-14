@@ -1,18 +1,17 @@
 import { AfterViewInit, Component, ViewChild } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { MatTableDataSource } from '@angular/material/table';
 import { validateHorizontalPosition } from '@angular/cdk/overlay';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
-import { AuthService } from 'src/app/services/auth.service';
 import { UserDto } from 'src/app/dtos/user-dto';
 import { catchError, map } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import { IamService } from 'src/app/services/iam.service';
+import { UserService } from 'src/app/services/iam-service/user.service';
 import { MatDialog } from '@angular/material/dialog';
-import { UpdateDialogComponent } from './dialogs/update-dialog/update-dialog.component';
-import { AddDialogComponent } from './dialogs/add-dialog/add-dialog.component';
+import { UpdateUserDialogComponent } from './dialogs/update-user-dialog/update-user-dialog.component';
+import { AddEmployeeDialogComponent } from './dialogs/add-employee-dialog/add-employee-dialog.component';
 import { EmployeeDto } from 'src/app/dtos/employee-dto';
+import { UserInfoDialogComponent } from './dialogs/user-info-dialog/user-info-dialog.component';
 
 @Component({
 	selector: 'app-users',
@@ -23,7 +22,6 @@ export class UsersComponent implements AfterViewInit {
 	displayedColumns: string[] = [
 		'id',
 		'email',
-		'username',
 		'dateOfBirth',
 		'phone',
 		'address',
@@ -39,9 +37,7 @@ export class UsersComponent implements AfterViewInit {
 	activeUser: UserDto | null = null;
 
 	constructor(
-		private http: HttpClient,
-		private authService: AuthService,
-		private iamService: IamService,
+		private userService: UserService,
 		public dialog: MatDialog,
 	) {
 		this.dataSource = new MatTableDataSource();
@@ -61,9 +57,17 @@ export class UsersComponent implements AfterViewInit {
 		if (this.dataSource.paginator) {
 			this.dataSource.paginator.firstPage();
 		}
+
+		//pri filtriranju deslektuje korisnika i ako nadje samo 1 slektuje ga
+		const filteredData = this.dataSource.filteredData;
+		if (filteredData.length === 1) {
+			this.selectedRow = filteredData[0];
+		} else {
+			this.selectedRow = null;
+		}
 	}
 
-	selectRow(row: UserDto): void {
+	selectRow(row: UserDto) {
 		if (this.selectedRow?.id != row.id) {
 			this.selectedRow = row;
 		}
@@ -77,9 +81,15 @@ export class UsersComponent implements AfterViewInit {
 		return (this.selectedRow as EmployeeDto)?.active ?? false;
 	}
 
+	clearSelection() {
+		this.selectedRow = null;
+	}
+
 	updateUserDisabled(): boolean {
 		if (
 			this.selectedRow?.role == 'ADMIN' ||
+			this.selectedRow?.role == 'SUPERVISOR' ||
+			this.selectedRow?.role == 'AGENT' ||
 			(this.activeUser?.role == 'EMPLOYEE' &&
 				this.selectedRow?.role == 'EMPLOYEE')
 		) {
@@ -88,8 +98,21 @@ export class UsersComponent implements AfterViewInit {
 		return false;
 	}
 
-	fetchAllData(): void {
-		this.iamService
+	deleteUserDisabled(): boolean {
+		if (
+			this.selectedRow?.role == 'ADMIN' ||
+			(this.activeUser?.role == 'EMPLOYEE' &&
+				(this.selectedRow?.role == 'EMPLOYEE' ||
+					this.selectedRow?.role == 'SUPERVISOR' ||
+					this.selectedRow?.role == 'AGENT'))
+		) {
+			return true;
+		}
+		return false;
+	}
+
+	fetchAllData() {
+		this.userService
 			.getFindAll()
 			.pipe(
 				map(dataSource => {
@@ -104,8 +127,8 @@ export class UsersComponent implements AfterViewInit {
 			.subscribe();
 	}
 
-	fetchActiveUserData(): void {
-		this.iamService
+	fetchActiveUserData() {
+		this.userService
 			.getFindById(Number(localStorage.getItem('id')))
 			.pipe(
 				map(data => {
@@ -120,9 +143,18 @@ export class UsersComponent implements AfterViewInit {
 			.subscribe();
 	}
 
-	activateEmployee(): void {
+	viewUser(row: UserDto) {
+		if (this.selectedRow != null) {
+			this.dialog.open(UserInfoDialogComponent, {
+				data: { selectedRow: row },
+				autoFocus: false,
+			});
+		}
+	}
+
+	activateEmployee() {
 		if (this.selectedRow != null && this.selectedRow.role == 'EMPLOYEE') {
-			this.iamService
+			this.userService
 				.putActivateEmployee(this.selectedRow.id)
 				.pipe(
 					catchError(error => {
@@ -131,15 +163,15 @@ export class UsersComponent implements AfterViewInit {
 					}),
 				)
 				.subscribe(() => {
-					this.fetchAllData();
 					this.selectedRow = null;
+					this.fetchAllData();
 				});
 		}
 	}
 
-	deactivateEmployee(): void {
+	deactivateEmployee() {
 		if (this.selectedRow != null && this.selectedRow.role == 'EMPLOYEE') {
-			this.iamService
+			this.userService
 				.putDeactivateEmployee(this.selectedRow.id)
 				.pipe(
 					catchError(error => {
@@ -148,39 +180,44 @@ export class UsersComponent implements AfterViewInit {
 					}),
 				)
 				.subscribe(() => {
-					this.fetchAllData();
 					this.selectedRow = null;
+					this.fetchAllData();
 				});
 		}
 	}
 
-	addUser(): void {
-		const dialogRef = this.dialog.open(AddDialogComponent);
+	addEmployee() {
+		const dialogRef = this.dialog.open(AddEmployeeDialogComponent, {
+			autoFocus: false,
+		});
 
-		dialogRef.afterClosed().subscribe(result => {
-			console.log(`Dialog result: ${result}`);
+		dialogRef.afterClosed().subscribe(() => {
 			this.selectedRow = null;
-			this.fetchAllData();
+			setTimeout(() => {
+				this.fetchAllData();
+			}, 1000);
 		});
 	}
 
-	updateUser(): void {
+	updateUser() {
 		if (this.selectedRow != null) {
-			const dialogRef = this.dialog.open(UpdateDialogComponent, {
+			const dialogRef = this.dialog.open(UpdateUserDialogComponent, {
 				data: { selectedRow: this.selectedRow },
+				autoFocus: false,
 			});
 
-			dialogRef.afterClosed().subscribe(result => {
-				console.log(`Dialog result: ${result}`);
+			dialogRef.afterClosed().subscribe(() => {
 				this.selectedRow = null;
-				this.fetchAllData();
+				setTimeout(() => {
+					this.fetchAllData();
+				}, 1000);
 			});
 		}
 	}
 
-	deleteUser(): void {
+	deleteUser() {
 		if (this.selectedRow != null) {
-			this.iamService
+			this.userService
 				.delete(this.selectedRow.email)
 				.pipe(
 					catchError(error => {
@@ -190,7 +227,9 @@ export class UsersComponent implements AfterViewInit {
 				)
 				.subscribe(() => {
 					this.selectedRow = null;
-					this.fetchAllData();
+					setTimeout(() => {
+						this.fetchAllData();
+					}, 1000);
 				});
 		}
 	}
