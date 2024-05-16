@@ -1,11 +1,11 @@
 import { Component, Inject } from '@angular/core';
 import { ForexDto } from '../../../dtos/forex-dto';
-import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
 import { StockService } from '../../../services/stock-service/stock.service';
 import { ForexService } from '../../../services/stock-service/forex.service';
 import {
-	PubliclyTradableSecuritiesPopupService
-} from '../../../services/stock-service/publicly-tradable-securities-popup.service';
+	PubliclyTradableSecuritiesPopupComponent
+} from '../publicly-tradable-securities-popup/publicly-tradable-securities-popup.component';
 
 @Component({
   selector: 'app-publicly-tradable-securities-info-dialog',
@@ -19,7 +19,7 @@ export class PubliclyTradableSecuritiesInfoDialogComponent {
 	constructor(
 		@Inject(MAT_DIALOG_DATA) public data: any,
 		private stockService: StockService,
-		private publiclyTradableSecuritiesPopupService: PubliclyTradableSecuritiesPopupService,
+		private dialog: MatDialog,
 		private forexService: ForexService,
 	) {
 		this.fetchData();
@@ -49,6 +49,7 @@ export class PubliclyTradableSecuritiesInfoDialogComponent {
 	}
 
 	openPopup() {
-		this.publiclyTradableSecuritiesPopupService.openPopupPubliclyTradableSecurities();
+		const dialogRef = this.dialog.open(PubliclyTradableSecuritiesPopupComponent,
+			{});
 	}
 }

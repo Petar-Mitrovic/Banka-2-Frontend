@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
 import { StockDto } from '../../../../dtos/stock-dto';
 import { StockService } from '../../../../services/stock-service/stock.service';
 import { OptionService } from 'src/app/services/stock-service/option.service';
@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { StockPopupComponent } from '../stock-popup/stock-popup.component';
-import { PopupService } from '../../../../services/stock-service/popup.service';
+
 
 @Component({
 	selector: 'app-stock-info-dialog',
@@ -22,7 +22,7 @@ export class StockInfoDialogComponent {
 		@Inject(MAT_DIALOG_DATA) public data: any,
 		private stockService: StockService,
 		private optionService: OptionService,
-		private popupService: PopupService,
+		private dialog: MatDialog,
 		private router: Router,
 	) {
 		this.fetchData();
@@ -72,7 +72,10 @@ export class StockInfoDialogComponent {
 	}
 
 	openPopup() {
-		this.popupService.openPopup();
+		const dialogRef = this.dialog.open(StockPopupComponent, {
+			//width: '250px',
+
+		});
 	}
 
 
